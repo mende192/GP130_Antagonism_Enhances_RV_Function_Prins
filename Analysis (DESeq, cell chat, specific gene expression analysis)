@@ -168,25 +168,3 @@ mac_subset.mtx <- subset(Mac_only.mtx, NLRP3 > 1.8)
 table(Idents(mac_subset.mtx), mac_subset.mtx$orig.ident)
 table(Idents(mac.mtx), mac.mtx$condition)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
