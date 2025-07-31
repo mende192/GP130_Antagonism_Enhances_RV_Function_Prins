@@ -1,0 +1,192 @@
+library(Seurat)
+library(ggplot2)
+library(SeuratData)
+library(EnhancedVolcano)
+library(DESeq2)
+library(BiocManager)
+library(tidyr)
+library(gridExtra)
+library(tidyverse)
+
+
+#Identifying CM contamination (PMID: 35959412)
+Idents(total.mtx) <- total.mtx$cells
+markers.CM <- FindConservedMarkers(total.mtx, ident.1 = 'Cardiomyocytes', only.pos = TRUE, grouping.var = 'condition')
+view(markers.CM)
+cm.genes <- rownames(markers.CM)
+cm.genes <- c(cm.genes, "NPPA")
+cm.genes.100 <- cm.genes[c(1:100,1712,2447)] #NPPB, NPPA
+
+#DESeq2
+View(total.mtx@meta.data)
+total.mtx$samples <- paste0(total.mtx$cells, total.mtx$orig.ident)
+
+cts <- AggregateExpression(total.mtx,
+                           group.by = c("cells", "samples"),
+                           assays = "RNA",
+                           slot = "counts",
+                           return.seurat = FALSE)
+cts <- cts$RNA
+cts.t <- t(cts)
+cts.t <- as.data.frame(cts.t)
+splitRows <- gsub('_.*', '', rownames(cts.t))
+
+cts.split <- split.data.frame(cts.t,
+                              f = factor(splitRows))
+
+cts.split.modified <- lapply(cts.split, function(x){
+  rownames(x) <- gsub('.*_(.*)', '\\1', rownames(x))
+  t(x)
+  
+})
+
+# Cardiomyocyte DEGs
+counts_CM <- cts.split.modified$Cardiomyocytes
+colData <- data.frame(samples = colnames(counts_CM))
+colData$condition <- c("PAB_VEH", "PAB_VEH", "CONTROL", "CONTROL", "CONTROL", "CONTROL", "PAB_SC144", "PAB_SC144", "PAB_SC144", "PAB_SC144", "PAB_VEH", "PAB_VEH")
+colData <- column_to_rownames(colData, var = 'samples')
+dds_CM <- DESeqDataSetFromMatrix(countData = counts_CM,
+                              colData = colData,
+                              design = ~condition)
+keep <- rowSums(counts(dds_CM)) >=10
+dds_CM <- dds_CM[keep,]
+dds_CM <- DESeq(dds_CM)
+
+#These comparisons are c("condition", "numerator", "denominator")
+VEH_vs_SC144_CM_res <- results(dds_CM, contrast =c("condition", "PAB_SC144", "PAB_VEH"))
+Control_vs_SC144_CM_res <- results(dds_CM, contrast =c("condition", "PAB_SC144", "CONTROL"))
+Control_vs_VEH__CMres <- results(dds_CM, contrast =c("condition", "PAB_VEH", "CONTROL"))
+
+
+#Any non Cardiomyocyte DEGs (i.e. macrophages)
+counts_Mac <- cts.split.modified$Macrophages
+colData_mac <- data.frame(samples = colnames(counts_Mac))
+counts_Mac <- counts_Mac[-which(rownames(counts_Mac) %in% cm.genes.100),] #removing CM contamination (PMID: 35959412)
+colData_mac$condition <- c("PAB_VEH", "PAB_VEH", "CONTROL", "CONTROL", "CONTROL", "CONTROL", "PAB_SC144", "PAB_SC144", "PAB_SC144", "PAB_SC144", "PAB_VEH", "PAB_VEH")
+colData_mac <- column_to_rownames(colData_mac, var = 'samples')
+dds_mac <- DESeqDataSetFromMatrix(countData = counts_Mac,
+                              colData = colData_mac,
+                              design = ~condition)
+keep <- rowSums(counts(dds_mac)) >=10
+dds_mac <- dds_mac[keep,]
+dds_mac <- DESeq(dds_mac)
+
+#These comparisons are c("condition", "numerator", "denominator")
+VEH_vs_SC144_res_mac <- results(dds_mac, contrast =c("condition","PAB_SC144", "PAB_VEH"))
+Control_vs_SC144_res_mac <- results(dds_mac, contrast =c("condition", "PAB_SC144", "CONTROL"))
+Control_vs_VEH_res_mac <- results(dds_mac, contrast =c("condition", "PAB_VEH", "CONTROL"))
+
+#Combined DEG graph - need to pseudobulk and run DESeq2 first
+
+#turn deseq objects into data frames - one comparison at a time
+cv_cm <- as.data.frame(Control_vs_VEH__CMres)
+cv_macs <- as.data.frame(Control_vs_VEH_res_mac)
+cv_smc <- as.data.frame(Control_vs_VEH__smc_res)
+cv_peri <- as.data.frame(Control_vs_VEH__pericytes_res)
+cv_fibro <- as.data.frame(Control_vs_VEH__fibro_res)
+cv_lymph <- as.data.frame(Control_vs_VEH_res_lym)
+cv_endo <- as.data.frame(Control_vs_VEH__endo_res)
+cv_neuro <- as.data.frame(Control_vs_VEH__neuro_res)
+
+#Combine into 1 object
+cv_celltypes_combined <- rbind(cbind(cv_cm, group = "7 Cardiomyoyctes"), cbind(cv_macs, group = "1 Macrophages"), cbind(cv_smc, group = "6 Smooth Muscle Cells"),
+                               cbind(cv_peri, group = "5 Pericytes"), cbind(cv_fibro, group = "2 Fibroblasts"), cbind(cv_lymph, group = "3 Lymphocytes"), 
+                               cbind(cv_endo, group = "4 Endothelial Cells"), cbind(cv_neuro, group = "8 Neuronal Cells"))
+
+padj.cutoff <- 0.05
+lfc.cutoff <- 0.5
+threshold <- cv_celltypes_combined$padj < padj.cutoff & abs(cv_celltypes_combined$log2FoldChange) > lfc.cutoff
+cv_celltypes_combined$threshold <- threshold
+cv_celltypes_combined <- subset(cv_celltypes_combined, cv_celltypes_combined$threshold == "TRUE" | cv_celltypes_combined$threshold == "FALSE")
+
+pos_threshold <- cv_celltypes_combined$padj < padj.cutoff & cv_celltypes_combined$log2FoldChange > lfc.cutoff
+cv_celltypes_combined$pos_threshold <- pos_threshold
+neg_threshold <- cv_celltypes_combined$padj < padj.cutoff & cv_celltypes_combined$log2FoldChange < -(lfc.cutoff)
+cv_celltypes_combined$neg_threshold <- neg_threshold
+
+level <- cv_celltypes_combined %>%
+  mutate(ifelse(cv_celltypes_combined$pos_threshold == "TRUE" & cv_celltypes_combined$neg_threshold == "FALSE", "level 1",
+                ifelse(cv_celltypes_combined$pos_threshold == "FALSE" & cv_celltypes_combined$neg_threshold == "FALSE", "level 2",
+                       ifelse(cv_celltypes_combined$pos_threshold == "FALSE" & cv_celltypes_combined$neg_threshold == "TRUE", "level 3", NA))))
+cv_celltypes_combined$level <- level
+
+ggplot(cv_celltypes_combined) +
+  aes(x=group, y=log2FoldChange, color = level$`ifelse(...)`, levels = c()) + geom_jitter(alpha = 0.4) +
+  scale_color_manual(name = "level",
+                     values = c("level 1" = "red1", "level 2" = "grey90", "level 3" = "mediumblue")) +
+  ggtitle("Veh vs control") + theme_classic() + geom_hline(yintercept = 0, linetype="dashed", color = "black") + 
+  ylim (-7,7) + guides(y=guide_axis(minor.ticks = TRUE)) + 
+  theme(legend.position = "none",
+        plot.title = element_text(size = rel(1.5), hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()) 
+
+# Cell Chat
+library(Seurat)
+library(devtools)
+library(NMF)
+library(circlize)
+library(ComplexHeatmap)
+library(CellChat)
+library(ggalluvial)
+library(ggplot2)
+
+#Create individual cellchat objects - repeat for each group
+control.total.mtx <- subset(total.mtx, subset = condition == "CONTROL")
+cellchat.control <- createCellChat(object = control.total.mtx, group.by = "cells", assay = "RNA")
+
+CellChatDB <- CellChatDB.human
+showDatabaseCategory(CellChatDB)
+cellchatDB.use <- CellChatDB
+cellchat.control@DB <- cellchatDB.use
+
+cellchat.control <- subsetData(cellchat.control)
+cellchat.control <- identifyOverExpressedGenes(cellchat.control)
+cellchat.control <- identifyOverExpressedInteractions(cellchat.control)
+cellchat.control <- computeCommunProb(cellchat.control)
+cellchat.control <- filterCommunication(cellchat.control, min.cells = 10)
+cellchat.control <- computeCommunProbPathway(cellchat.control)
+cellchat.control <- aggregateNet(cellchat.control)
+cellchat.control <- netAnalysis_computeCentrality(cellchat.control)
+
+# Comparing 2 groups - repeat for all comparisons
+control.veh.list <- list(con = cellchat.control, veh = cellchat.veh)
+cellchat.con.veh <- mergeCellChat(control.veh.list, add.names = names(control.veh.list))
+
+netVisual_bubble(cellchat.con.veh, comparison = c(1,2), sources.use = c("Macrophages", "Lymphocytes"), title.name = "pab-veh vs con signaling from immune cells")
+netVisual_bubble(cellchat.con.veh, comparison = c(1,2), sources.use = c("Endothelial Cells", "Pericytes"), targets.use = c("Endothelial Cells","Pericytes"))
+
+# Specific gene expression analysis
+#HIF1 expression in CMs
+cm.mtx <- subset(total.mtx, subset = cells == "Cardiomyocytes")
+DotPlot(cm.mtx, features = "HIF1A", group.by = "condition", cols = c("darkblue","orangered"))
+DotPlot(cm.mtx, features = "HIF1A", group.by = "annotation", cols = c("darkblue","orangered"))
+
+#Macrophage with high NLRP3 expression
+mac.mtx <- subset(total.mtx, subset = cells == "Macrophages")
+mac_subset.mtx <- subset(Mac_only.mtx, NLRP3 > 1.8)
+table(Idents(mac_subset.mtx), mac_subset.mtx$orig.ident)
+table(Idents(mac.mtx), mac.mtx$condition)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
