@@ -51,12 +51,12 @@ dds_CM <- DESeqDataSetFromMatrix(countData = counts_CM,
 keep <- rowSums(counts(dds_CM)) >=10
 dds_CM <- dds_CM[keep,]
 dds_CM <- DESeq(dds_CM)
+CM_normalized_counts <- counts(dds_CM, normalized = TRUE) #If normalized counts are needed
 
 #These comparisons are c("condition", "numerator", "denominator")
 VEH_vs_SC144_CM_res <- results(dds_CM, contrast =c("condition", "PAB_SC144", "PAB_VEH"))
 Control_vs_SC144_CM_res <- results(dds_CM, contrast =c("condition", "PAB_SC144", "CONTROL"))
 Control_vs_VEH__CMres <- results(dds_CM, contrast =c("condition", "PAB_VEH", "CONTROL"))
-
 
 #Any non Cardiomyocyte DEGs (i.e. macrophages)
 counts_Mac <- cts.split.modified$Macrophages
