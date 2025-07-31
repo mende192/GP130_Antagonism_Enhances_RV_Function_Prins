@@ -1,0 +1,565 @@
+library(Seurat)
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+library(tidyverse)
+library(DoubletFinder)
+
+
+#PAB-SC144
+cpa2.mtx <- ReadMtx(mtx = "CPA2/2matrix.mtx.gz",features = "CPA2/2features.tsv.gz",cells = "CPA2/2barcodes.tsv.gz")
+cpa3.mtx <- ReadMtx(mtx = "CPA3/3matrix.mtx.gz",features = "CPA3/3features.tsv.gz",cells = "CPA3/3barcodes.tsv.gz")
+cpa5.mtx <- ReadMtx(mtx = "CPA5/5matrix.mtx.gz",features = "CPA5/5features.tsv.gz",cells = "CPA5/5barcodes.tsv.gz")
+cpa17.mtx <- ReadMtx(mtx = "CPA17/17matrix.mtx.gz",features = "CPA17/17features.tsv.gz",cells = "CPA17/17barcodes.tsv.gz")
+
+#PAB-VEH
+cpa8.mtx <- ReadMtx(mtx = "CPA8/8matrix.mtx.gz",features = "CPA8/8features.tsv.gz",cells = "CPA8/8barcodes.tsv.gz")
+cpa9.mtx <- ReadMtx(mtx = "CPA9/9matrix.mtx.gz",features = "CPA9/9features.tsv.gz",cells = "CPA9/9barcodes.tsv.gz")
+cpa10.mtx <- ReadMtx(mtx = "CPA10/10matrix.mtx.gz",features = "CPA10/10features.tsv.gz",cells = "CPA10/10barcodes.tsv.gz")
+cpa11.mtx <- ReadMtx(mtx = "CPA11/11matrix.mtx.gz",features = "CPA11/11features.tsv.gz",cells = "CPA11/11barcodes.tsv.gz")
+
+#CONTROL
+cpa12.mtx <- ReadMtx(mtx = "CPA12/12matrix.mtx.gz",features = "CPA12/12features.tsv.gz",cells = "CPA12/12barcodes.tsv.gz")
+cpa13.mtx <- ReadMtx(mtx = "CPA13/13matrix.mtx.gz",features = "CPA13/13features.tsv.gz",cells = "CPA13/13barcodes.tsv.gz")
+cpa14.mtx <- ReadMtx(mtx = "CPA14/14matrix.mtx.gz",features = "CPA14/14features.tsv.gz",cells = "CPA14/14barcodes.tsv.gz")
+cpa15.mtx <- ReadMtx(mtx = "CPA15/15matrix.mtx.gz",features = "CPA15/15features.tsv.gz",cells = "CPA15/15barcodes.tsv.gz")
+
+#Turn data into seurat objects
+cpa2s.mtx <- CreateSeuratObject(counts = cpa2.mtx, project = "CPA.2.RV", min.cells = 3, min.features = 200)
+cpa3s.mtx <- CreateSeuratObject(counts = cpa3.mtx, project = "CPA.3.RV", min.cells = 3, min.features = 200)
+cpa5s.mtx <- CreateSeuratObject(counts = cpa5.mtx, project = "CPA.5.RV", min.cells = 3, min.features = 200)
+cpa17s.mtx <- CreateSeuratObject(counts = cpa17.mtx, project = "CPA.17.RV", min.cells = 3, min.features = 200)
+
+cpa8s.mtx <- CreateSeuratObject(counts = cpa8.mtx, project = "CPA.8.RV", min.cells = 3, min.features = 200)
+cpa9s.mtx <- CreateSeuratObject(counts = cpa9.mtx, project = "CPA.9.RV", min.cells = 3, min.features = 200)
+cpa10s.mtx <- CreateSeuratObject(counts = cpa10.mtx, project = "CPA.10.RV", min.cells = 3, min.features = 200)
+cpa11s.mtx <- CreateSeuratObject(counts = cpa11.mtx, project = "CPA.11.RV", min.cells = 3, min.features = 200)
+
+cpa12s.mtx <- CreateSeuratObject(counts = cpa12.mtx, project = "CPA.12.RV", min.cells = 3, min.features = 200)
+cpa13s.mtx <- CreateSeuratObject(counts = cpa13.mtx, project = "CPA.13.RV", min.cells = 3, min.features = 200)
+cpa14s.mtx <- CreateSeuratObject(counts = cpa14.mtx, project = "CPA.14.RV", min.cells = 3, min.features = 200)
+cpa15s.mtx <- CreateSeuratObject(counts = cpa15.mtx, project = "CPA.15.RV", min.cells = 3, min.features = 200)
+
+#Data filtering
+cpa2s.mtx <- subset(cpa2s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa3s.mtx <- subset(cpa3s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa5s.mtx <- subset(cpa5s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa17s.mtx <- subset(cpa17s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+
+cpa8s.mtx <- subset(cpa8s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa9s.mtx <- subset(cpa9s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa10s.mtx <- subset(cpa10s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa11s.mtx <- subset(cpa11s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+
+cpa12s.mtx <- subset(cpa12s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa13s.mtx <- subset(cpa13s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa14s.mtx <- subset(cpa14s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+cpa15s.mtx <- subset(cpa15s.mtx, subset = nFeature_RNA > 200 & nFeature_RNA < 4000)
+
+#Check for mitochondrial DNA contamination
+cpa2s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa2s.mtx, pattern = '^MT-')
+cpa3s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa3s.mtx, pattern = '^MT-')
+cpa5s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa5s.mtx, pattern = '^MT-')
+cpa17s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa17s.mtx, pattern = '^MT-')
+
+cpa8s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa8s.mtx, pattern = '^MT-')
+cpa9s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa9s.mtx, pattern = '^MT-')
+cpa10s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa10s.mtx, pattern = '^MT-')
+cpa11s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa11s.mtx, pattern = '^MT-')
+
+cpa12s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa12s.mtx, pattern = '^MT-')
+cpa13s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa13s.mtx, pattern = '^MT-')
+cpa14s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa14s.mtx, pattern = '^MT-')
+cpa15s.mtx[['percent.mt']] <- PercentageFeatureSet(cpa15s.mtx, pattern = '^MT-')
+
+#Normalize Data
+cpa2s.mtx <- NormalizeData(cpa2s.mtx)
+cpa3s.mtx <- NormalizeData(cpa3s.mtx)
+cpa5s.mtx <- NormalizeData(cpa5s.mtx)
+cpa17s.mtx <- NormalizeData(cpa17s.mtx)
+
+cpa8s.mtx <- NormalizeData(cpa8s.mtx)
+cpa9s.mtx <- NormalizeData(cpa9s.mtx)
+cpa10s.mtx <- NormalizeData(cpa10s.mtx)
+cpa11s.mtx <- NormalizeData(cpa11s.mtx)
+
+cpa12s.mtx <- NormalizeData(cpa12s.mtx)
+cpa13s.mtx <- NormalizeData(cpa13s.mtx)
+cpa14s.mtx <- NormalizeData(cpa14s.mtx)
+cpa15s.mtx <- NormalizeData(cpa15s.mtx)
+
+#Identify highly variable features
+cpa2s.mtx <- FindVariableFeatures(cpa2s.mtx)
+cpa3s.mtx <- FindVariableFeatures(cpa3s.mtx)
+cpa5s.mtx <- FindVariableFeatures(cpa5s.mtx)
+cpa17s.mtx <- FindVariableFeatures(cpa17s.mtx)
+
+cpa8s.mtx <- FindVariableFeatures(cpa8s.mtx)
+cpa9s.mtx <- FindVariableFeatures(cpa9s.mtx)
+cpa10s.mtx <- FindVariableFeatures(cpa10s.mtx)
+cpa11s.mtx <- FindVariableFeatures(cpa11s.mtx)
+
+cpa12s.mtx <- FindVariableFeatures(cpa12s.mtx)
+cpa13s.mtx <- FindVariableFeatures(cpa13s.mtx)
+cpa14s.mtx <- FindVariableFeatures(cpa14s.mtx)
+cpa15s.mtx <- FindVariableFeatures(cpa15s.mtx)
+
+#Scale the Data
+cpa2s.genes <- rownames(cpa2s.mtx)
+cpa2s.mtx <- ScaleData(cpa2s.mtx, features = cpa2s.genes)
+
+cpa3s.genes <- rownames(cpa3s.mtx)
+cpa3s.mtx <- ScaleData(cpa3s.mtx, features = cpa3s.genes)
+
+cpa5s.genes <- rownames(cpa5s.mtx)
+cpa5s.mtx <- ScaleData(cpa5s.mtx, features = cpa5s.genes)
+
+cpa17s.genes <- rownames(cpa17s.mtx)
+cpa17s.mtx <- ScaleData(cpa17s.mtx, features = cpa17s.genes)
+
+cpa8s.genes <- rownames(cpa8s.mtx)
+cpa8s.mtx <- ScaleData(cpa8s.mtx, features = cpa8s.genes)
+
+cpa9s.genes <- rownames(cpa9s.mtx)
+cpa9s.mtx <- ScaleData(cpa9s.mtx, features = cpa9s.genes)
+
+cpa10s.genes <- rownames(cpa10s.mtx)
+cpa10s.mtx <- ScaleData(cpa10s.mtx, features = cpa10s.genes)
+
+cpa11s.genes <- rownames(cpa11s.mtx)
+cpa11s.mtx <- ScaleData(cpa11s.mtx, features = cpa11s.genes)
+
+cpa12s.genes <- rownames(cpa12s.mtx)
+cpa12s.mtx <- ScaleData(cpa12s.mtx, features = cpa12s.genes)
+
+cpa13s.genes <- rownames(cpa13s.mtx)
+cpa13s.mtx <- ScaleData(cpa13s.mtx, features = cpa13s.genes)
+
+cpa14s.genes <- rownames(cpa14s.mtx)
+cpa14s.mtx <- ScaleData(cpa14s.mtx, features = cpa14s.genes)
+
+cpa15s.genes <- rownames(cpa15s.mtx)
+cpa15s.mtx <- ScaleData(cpa15s.mtx, features = cpa15s.genes)
+
+#Linear dimensional reduction
+cpa2s.mtx <- RunPCA(cpa2s.mtx, features = VariableFeatures(object = cpa2s.mtx))
+cpa3s.mtx <- RunPCA(cpa3s.mtx, features = VariableFeatures(object = cpa3s.mtx))
+cpa5s.mtx <- RunPCA(cpa5s.mtx, features = VariableFeatures(object = cpa5s.mtx))
+cpa17s.mtx <- RunPCA(cpa17s.mtx, features = VariableFeatures(object = cpa17s.mtx))
+
+cpa8s.mtx <- RunPCA(cpa8s.mtx, features = VariableFeatures(object = cpa8s.mtx))
+cpa9s.mtx <- RunPCA(cpa9s.mtx, features = VariableFeatures(object = cpa9s.mtx))
+cpa10s.mtx <- RunPCA(cpa10s.mtx, features = VariableFeatures(object = cpa10s.mtx))
+cpa11s.mtx <- RunPCA(cpa11s.mtx, features = VariableFeatures(object = cpa11s.mtx))
+
+cpa12s.mtx <- RunPCA(cpa12s.mtx, features = VariableFeatures(object = cpa12s.mtx))
+cpa13s.mtx <- RunPCA(cpa13s.mtx, features = VariableFeatures(object = cpa13s.mtx))
+cpa14s.mtx <- RunPCA(cpa14s.mtx, features = VariableFeatures(object = cpa14s.mtx))
+cpa15s.mtx <- RunPCA(cpa15s.mtx, features = VariableFeatures(object = cpa15s.mtx))
+
+#Elbow plots
+ElbowPlot(cpa2s.mtx)
+ElbowPlot(cpa3s.mtx)
+ElbowPlot(cpa5s.mtx)
+ElbowPlot(cpa17s.mtx)
+
+ElbowPlot(cpa8s.mtx)
+ElbowPlot(cpa9s.mtx)
+ElbowPlot(cpa10s.mtx)
+ElbowPlot(cpa11s.mtx)
+
+ElbowPlot(cpa12s.mtx)
+ElbowPlot(cpa13s.mtx)
+ElbowPlot(cpa14s.mtx)
+ElbowPlot(cpa15s.mtx)
+
+#Cluster data
+cpa2s.mtx <- FindNeighbors(cpa2s.mtx, dims = 1:16)
+cpa2s.mtx <- RunUMAP(cpa2s.mtx, dims = 1:16)
+DimPlot(cpa2s.mtx, reduction = 'umap')
+
+cpa3s.mtx <- FindNeighbors(cpa3s.mtx, dims = 1:15)
+cpa3s.mtx <- RunUMAP(cpa3s.mtx, dims = 1:15)
+DimPlot(cpa3s.mtx, reduction = 'umap')
+
+cpa5s.mtx <- FindNeighbors(cpa5s.mtx, dims = 1:18)
+cpa5s.mtx <- RunUMAP(cpa5s.mtx, dims = 1:18)
+DimPlot(cpa5s.mtx, reduction = 'umap')
+
+cpa17s.mtx <- FindNeighbors(cpa17s.mtx, dims = 1:15)
+cpa17s.mtx <- RunUMAP(cpa17s.mtx, dims = 1:15)
+DimPlot(cpa17s.mtx, reduction = 'umap')
+
+cpa8s.mtx <- FindNeighbors(cpa8s.mtx, dims = 1:18)
+cpa8s.mtx <- RunUMAP(cpa8s.mtx, dims = 1:18)
+DimPlot(cpa8s.mtx, reduction = 'umap')
+
+cpa9s.mtx <- FindNeighbors(cpa9s.mtx, dims = 1:16)
+cpa9s.mtx <- RunUMAP(cpa9s.mtx, dims = 1:16)
+DimPlot(cpa9s.mtx, reduction = 'umap')
+
+cpa10s.mtx <- FindNeighbors(cpa10s.mtx, dims = 1:18)
+cpa10s.mtx <- RunUMAP(cpa10s.mtx, dims = 1:18)
+DimPlot(cpa10s.mtx, reduction = 'umap')
+
+cpa11s.mtx <- FindNeighbors(cpa11s.mtx, dims = 1:17)
+cpa11s.mtx <- RunUMAP(cpa11s.mtx, dims = 1:17)
+DimPlot(cpa11s.mtx, reduction = 'umap')
+
+cpa12s.mtx <- FindNeighbors(cpa12s.mtx, dims = 1:16)
+cpa12s.mtx <- RunUMAP(cpa12s.mtx, dims = 1:16)
+DimPlot(cpa12s.mtx, reduction = 'umap')
+
+cpa13s.mtx <- FindNeighbors(cpa13s.mtx, dims = 1:18)
+cpa13s.mtx <- RunUMAP(cpa13s.mtx, dims = 1:18)
+DimPlot(cpa13s.mtx, reduction = 'umap')
+
+cpa14s.mtx <- FindNeighbors(cpa14s.mtx, dims = 1:19)
+cpa14s.mtx <- RunUMAP(cpa14s.mtx, dims = 1:19)
+DimPlot(cpa14s.mtx, reduction = 'umap')
+
+cpa15s.mtx <- FindNeighbors(cpa15s.mtx, dims = 1:19)
+cpa15s.mtx <- RunUMAP(cpa15s.mtx, dims = 1:19)
+DimPlot(cpa15s.mtx, reduction = 'umap')
+
+
+#Find doublets CPA2
+#Find pK value
+sweep.res.list_cpa2 <- paramSweep(cpa2s.mtx, PCs = 1:16, sct = FALSE)
+sweep.stats_cpa2 <- summarizeSweep(sweep.res.list_cpa2, GT = FALSE)
+bcmvn_cpa2 <- find.pK(sweep.stats_cpa2)
+ggplot(bcmvn_cpa2, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa2 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa2s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.13*nrow(cpa2s.mtx@meta.data)) #13% estimated based on .8% doublets per 1000 cells and 16622 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa2s.mtx <- doubletFinder(cpa2s.mtx, PCs = 1:16, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa2s.mtx@meta.data)
+names(cpa2s.mtx@meta.data)
+DimPlot(cpa2s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.01_2150', raster = FALSE)
+table(cpa2s.mtx@meta.data$DF.classifications_0.25_0.01_2150)
+
+#subset data to keep only singlets
+cpa2s.mtx <- subset(cpa2s.mtx, subset = DF.classifications_0.25_0.01_2150 == 'Singlet')
+view(cpa2s.mtx@meta.data)
+table(cpa2s.mtx@meta.data$DF.classifications_0.25_0.01_2150)
+
+
+#Find doublets CPA3
+#Find pK value
+sweep.res.list_cpa3 <- paramSweep(cpa3s.mtx, PCs = 1:15, sct = FALSE)
+sweep.stats_cpa3 <- summarizeSweep(sweep.res.list_cpa3, GT = FALSE)
+bcmvn_cpa3 <- find.pK(sweep.stats_cpa3)
+ggplot(bcmvn_cpa3, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa3 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa3s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.15*nrow(cpa3s.mtx@meta.data)) #15% estimated based on .8% doublets per 1000 cells and 18700 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa3s.mtx <- doubletFinder(cpa3s.mtx, PCs = 1:15, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa3s.mtx@meta.data)
+names(cpa3s.mtx@meta.data)
+DimPlot(cpa3s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.02_2804', raster = FALSE)
+table(cpa3s.mtx@meta.data$DF.classifications_0.25_0.02_2804)
+
+#subset data to keep only singlets
+cpa3s.mtx <- subset(cpa3s.mtx, subset = DF.classifications_0.25_0.02_2804 == 'Singlet')
+table(cpa3s.mtx@meta.data$DF.classifications_0.25_0.02_2804)
+
+
+#Find doublets CPA5
+#Find pK value
+sweep.res.list_cpa5 <- paramSweep(cpa5s.mtx, PCs = 1:18, sct = FALSE)
+sweep.stats_cpa5 <- summarizeSweep(sweep.res.list_cpa5, GT = FALSE)
+bcmvn_cpa5 <- find.pK(sweep.stats_cpa5)
+ggplot(bcmvn_cpa5, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa5 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa5s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.14*nrow(cpa5s.mtx@meta.data)) #14% estimated based on .8% doublets per 1000 cells and 17600 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa5s.mtx <- doubletFinder(cpa5s.mtx, PCs = 1:18, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa5s.mtx@meta.data)
+names(cpa5s.mtx@meta.data)
+DimPlot(cpa5s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.01_2462', raster = FALSE)
+table(cpa5s.mtx@meta.data$DF.classifications_0.25_0.01_2462)
+
+#subset data to keep only singlets
+cpa5s.mtx <- subset(cpa5s.mtx, subset = DF.classifications_0.25_0.01_2462 == 'Singlet')
+table(cpa5s.mtx@meta.data$DF.classifications_0.25_0.01_2462)
+
+
+#Find doublets CPA17
+#Find pK value
+sweep.res.list_cpa17 <- paramSweep(cpa17s.mtx, PCs = 1:15, sct = FALSE)
+sweep.stats_cpa17 <- summarizeSweep(sweep.res.list_cpa17, GT = FALSE)
+bcmvn_cpa17 <- find.pK(sweep.stats_cpa17)
+ggplot(bcmvn_cpa17, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa17 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa17s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.075*nrow(cpa17s.mtx@meta.data)) #7.5% estimated based on .8% doublets per 1000 cells and 9400 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa17s.mtx <- doubletFinder(cpa17s.mtx, PCs = 1:15, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa17s.mtx@meta.data)
+names(cpa17s.mtx@meta.data)
+DimPlot(cpa17s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.04_697', raster = FALSE)
+table(cpa17s.mtx@meta.data$DF.classifications_0.25_0.04_697)
+
+#subset data to keep only singlets
+cpa17s.mtx <- subset(cpa17s.mtx, subset = DF.classifications_0.25_0.04_697 == 'Singlet')
+table(cpa17s.mtx@meta.data$DF.classifications_0.25_0.04_697)
+
+
+#Find doublets CPA8
+#Find pK value
+sweep.res.list_cpa8 <- paramSweep(cpa8s.mtx, PCs = 1:18, sct = FALSE)
+sweep.stats_cpa8 <- summarizeSweep(sweep.res.list_cpa8, GT = FALSE)
+bcmvn_cpa8 <- find.pK(sweep.stats_cpa8)
+ggplot(bcmvn_cpa8, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa8 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa8s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.15*nrow(cpa8s.mtx@meta.data)) #15% estimated based on .8% doublets per 1000 cells and 18800 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa8s.mtx <- doubletFinder(cpa8s.mtx, PCs = 1:18, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa8s.mtx@meta.data)
+names(cpa8s.mtx@meta.data)
+DimPlot(cpa8s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_2802', raster = FALSE)
+table(cpa8s.mtx@meta.data$DF.classifications_0.25_0.005_2802)
+
+#subset data to keep only singlets
+cpa8s.mtx <- subset(cpa8s.mtx, subset = DF.classifications_0.25_0.005_2802 == 'Singlet')
+table(cpa8s.mtx@meta.data$DF.classifications_0.25_0.005_2802)
+
+
+#Find doublets CPA9
+#Find pK value
+sweep.res.list_cpa9 <- paramSweep(cpa9s.mtx, PCs = 1:16, sct = FALSE)
+sweep.stats_cpa9 <- summarizeSweep(sweep.res.list_cpa9, GT = FALSE)
+bcmvn_cpa9 <- find.pK(sweep.stats_cpa9)
+ggplot(bcmvn_cpa9, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa9 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa9s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.17*nrow(cpa9s.mtx@meta.data)) #17% estimated based on .8% doublets per 1000 cells and 21000 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa9s.mtx <- doubletFinder(cpa9s.mtx, PCs = 1:16, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa9s.mtx@meta.data)
+names(cpa9s.mtx@meta.data)
+DimPlot(cpa9s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_3519', raster = FALSE)
+table(cpa9s.mtx@meta.data$DF.classifications_0.25_0.005_3519)
+
+#subset data to keep only singlets
+cpa9s.mtx <- subset(cpa9s.mtx, subset = DF.classifications_0.25_0.005_3519 == 'Singlet')
+table(cpa9s.mtx@meta.data$DF.classifications_0.25_0.005_3519)
+
+
+#Find doublets CPA10
+#Find pK value
+sweep.res.list_cpa10 <- paramSweep(cpa10s.mtx, PCs = 1:18, sct = FALSE)
+sweep.stats_cpa10 <- summarizeSweep(sweep.res.list_cpa10, GT = FALSE)
+bcmvn_cpa10 <- find.pK(sweep.stats_cpa10)
+ggplot(bcmvn_cpa10, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa10 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa10s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.16*nrow(cpa10s.mtx@meta.data)) #16% estimated based on .8% doublets per 1000 cells and 19600 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa10s.mtx <- doubletFinder(cpa10s.mtx, PCs = 1:18, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa10s.mtx@meta.data)
+names(cpa10s.mtx@meta.data)
+DimPlot(cpa10s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_3126', raster = FALSE)
+table(cpa10s.mtx@meta.data$DF.classifications_0.25_0.005_3126)
+
+#subset data to keep only singlets
+cpa10s.mtx <- subset(cpa10s.mtx, subset = DF.classifications_0.25_0.005_3126 == 'Singlet')
+table(cpa10s.mtx@meta.data$DF.classifications_0.25_0.005_3126)
+
+
+#Find doublets CPA11
+#Find pK value
+sweep.res.list_cpa11 <- paramSweep(cpa11s.mtx, PCs = 1:17, sct = FALSE)
+sweep.stats_cpa11 <- summarizeSweep(sweep.res.list_cpa11, GT = FALSE)
+bcmvn_cpa11 <- find.pK(sweep.stats_cpa11)
+ggplot(bcmvn_cpa11, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa11 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa11s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.2*nrow(cpa11s.mtx@meta.data)) #20% estimated based on .8% doublets per 1000 cells and 25000 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa11s.mtx <- doubletFinder(cpa11s.mtx, PCs = 1:17, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa11s.mtx@meta.data)
+names(cpa11s.mtx@meta.data)
+DimPlot(cpa11s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_4916', raster = FALSE)
+table(cpa11s.mtx@meta.data$DF.classifications_0.25_0.005_4916)
+
+#subset data to keep only singlets
+cpa11s.mtx <- subset(cpa11s.mtx, subset = DF.classifications_0.25_0.005_4916 == 'Singlet')
+table(cpa11s.mtx@meta.data$DF.classifications_0.25_0.005_4916)
+
+
+#Find doublets CPA12
+#Find pK value
+sweep.res.list_cpa12 <- paramSweep(cpa12s.mtx, PCs = 1:16, sct = FALSE)
+sweep.stats_cpa12 <- summarizeSweep(sweep.res.list_cpa12, GT = FALSE)
+bcmvn_cpa12 <- find.pK(sweep.stats_cpa12)
+ggplot(bcmvn_cpa12, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa12 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa12s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.12*nrow(cpa12s.mtx@meta.data)) #12% estimated based on .8% doublets per 1000 cells and 14800 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa12s.mtx <- doubletFinder(cpa12s.mtx, PCs = 1:16, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa12s.mtx@meta.data)
+names(cpa12s.mtx@meta.data)
+DimPlot(cpa12s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_1774', raster = FALSE)
+table(cpa12s.mtx@meta.data$DF.classifications_0.25_0.005_1774)
+
+#subset data to keep only singlets
+cpa12s.mtx <- subset(cpa12s.mtx, subset = DF.classifications_0.25_0.005_1774 == 'Singlet')
+table(cpa12s.mtx@meta.data$DF.classifications_0.25_0.005_1774)
+
+#Find doublets CPA13
+#Find pK value
+sweep.res.list_cpa13 <- paramSweep(cpa13s.mtx, PCs = 1:18, sct = FALSE)
+sweep.stats_cpa13 <- summarizeSweep(sweep.res.list_cpa13, GT = FALSE)
+bcmvn_cpa13 <- find.pK(sweep.stats_cpa13)
+ggplot(bcmvn_cpa13, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa13 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa13s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.05*nrow(cpa13s.mtx@meta.data)) #5% estimated based on .8% doublets per 1000 cells and 7000 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa13s.mtx <- doubletFinder(cpa13s.mtx, PCs = 1:18, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa13s.mtx@meta.data)
+names(cpa13s.mtx@meta.data)
+DimPlot(cpa13s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.14_337', raster = FALSE)
+table(cpa13s.mtx@meta.data$DF.classifications_0.25_0.14_337)
+
+#subset data to keep only singlets
+cpa13s.mtx <- subset(cpa13s.mtx, subset = DF.classifications_0.25_0.14_337 == 'Singlet')
+table(cpa13s.mtx@meta.data$DF.classifications_0.25_0.14_337)
+
+#Find doublets CPA14
+#Find pK value
+sweep.res.list_cpa14 <- paramSweep(cpa14s.mtx, PCs = 1:19, sct = FALSE)
+sweep.stats_cpa14 <- summarizeSweep(sweep.res.list_cpa14, GT = FALSE)
+bcmvn_cpa14 <- find.pK(sweep.stats_cpa14)
+ggplot(bcmvn_cpa14, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa14 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa14s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.01*nrow(cpa14s.mtx@meta.data)) #10% estimated based on .8% doublets per 1000 cells and 12000 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa14s.mtx <- doubletFinder(cpa14s.mtx, PCs = 1:19, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa14s.mtx@meta.data)
+names(cpa14s.mtx@meta.data)
+DimPlot(cpa14s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_120', raster = FALSE)
+table(cpa14s.mtx@meta.data$DF.classifications_0.25_0.005_120)
+
+#subset data to keep only singlets
+cpa14s.mtx <- subset(cpa14s.mtx, subset = DF.classifications_0.25_0.005_120 == 'Singlet')
+table(cpa14s.mtx@meta.data$DF.classifications_0.25_0.005_120)
+
+
+#Find doublets CPA15
+#Find pK value
+sweep.res.list_cpa15 <- paramSweep(cpa15s.mtx, PCs = 1:19, sct = FALSE)
+sweep.stats_cpa15 <- summarizeSweep(sweep.res.list_cpa15, GT = FALSE)
+bcmvn_cpa15 <- find.pK(sweep.stats_cpa15)
+ggplot(bcmvn_cpa15, aes(pK, BCmetric, group = 1)) + geom_point() + geom_line()
+
+pK <- bcmvn_cpa15 %>%
+  filter(BCmetric == max(BCmetric)) %>%
+  select(pK)
+pK <- as.numeric(as.character(pK[[1]]))
+
+annotations <- cpa15s.mtx@meta.data$seurat_clusters
+homotypic.prop <- modelHomotypic(annotations)
+nExp_poi <- round(0.11*nrow(cpa15s.mtx@meta.data)) #11% estimated based on .8% doublets per 1000 cells and 15000 cells recovered
+nExp_poi.adj <- round(nExp_poi*(1- homotypic.prop))
+
+cpa15s.mtx <- doubletFinder(cpa15s.mtx, PCs = 1:19, pN = 0.25, pK = pK, nExp = nExp_poi.adj, reuse.pANN = FALSE, sct = FALSE)
+view(cpa15s.mtx@meta.data)
+names(cpa15s.mtx@meta.data)
+DimPlot(cpa15s.mtx, reduction = 'umap', group.by = 'DF.classifications_0.25_0.005_1531', raster = FALSE)
+table(cpa15s.mtx@meta.data$DF.classifications_0.25_0.005_1531)
+
+#subset data to keep only singlets
+cpa15s.mtx <- subset(cpa15s.mtx, subset = DF.classifications_0.25_0.005_1531 == 'Singlet')
+table(cpa15s.mtx@meta.data$DF.classifications_0.25_0.005_1531)
+
+
+#Combine Matrices
+total.mtx <- merge(cpa2s.mtx, y = list(cpa3s.mtx, cpa5s.mtx, cpa17s.mtx, cpa8s.mtx, 
+cpa9s.mtx, cpa10s.mtx, cpa11s.mtx, cpa12s.mtx, cpa13s.mtx, cpa14s.mtx, cpa15s.mtx), 
+add.cell.ids = c("CPA2","CPA3", "CPA5", "CPA17", "CPA8", "CPA9", "CPA10", "CPA11", 
+"CPA12", "CPA13", "CPA14", "CPA15"), project = ("All.Samples"))
